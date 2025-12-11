@@ -1,0 +1,533 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String?
+  subscriptionTier String   @default("FREE") // FREE, SILVER, GOLD, PLATINUM
+  subscriptionEnd DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  investments     Investment[]
+  subscriptions   Subscription[]
+  payments        Payment[]
+  startups        Startup[]
+  enrollments     Enrollment[]
+  reviews         Review[]
+  reportPurchases ReportPurchase[]
+  apiSubscriptions ApiSubscription[]
+  adCampaigns     AdCampaign[]
+  exitRequests    ExitRequest[]
+  secondaryListings SecondaryListing[]
+  secondaryTradesAsBuyer SecondaryTrade[] @relation("BuyerTrades")
+  secondaryTradesAsSeller SecondaryTrade[] @relation("SellerTrades")
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String?
+  published Boolean  @default(false)
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Startup {
+  id              String   @id @default(cuid())
+  name            String
+  description     String
+  category        String
+  location        String
+  founded         Int      // Year founded
+  targetAmount    Float    // Target funding amount
+  raisedAmount    Float    @default(0) // Amount raised so far
+  equityOffered   Float    // Percentage equity offered
+  minInvestment   Float    // Minimum investment amount
+  rating          Float    @default(0) // Average rating
+  investorCount   Int      @default(0) // Number of investors
+  stage           String   // Seed, Pre-Series A, Series A, etc.
+  tags            String   // JSON array of tags
+  status          String   @default("DRAFT") // DRAFT, PENDING_REVIEW, ACTIVE, FUNDING_COMPLETE, CLOSED, REJECTED
+  listingTier     String   @default("BASIC") // BASIC, PREMIUM, ENTERPRISE
+  listingFee     Float    @default(0) // Listing fee paid
+  listingExpiry   DateTime? // Listing expiry date
+  featured        Boolean  @default(false) // Featured listing
+  featuredExpiry  DateTime? // Featured expiry date
+  founderId       String?  // Founder user ID
+  website         String?
+  pitchDeck       String?  // URL to pitch deck
+  businessPlan    String?  // URL to business plan
+  financials      String?  // URL to financial projections
+  teamInfo        String?  // JSON string with team information
+  regionId        String?  // For international expansion
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  investments     Investment[]
+  founder         User?    @relation(fields: [founderId], references: [id])
+  partnerships    PartnershipDeal[] @relation("PartnershipStartups")
+  exitOpportunities ExitOpportunity[]
+  exitRequests    ExitRequest[]
+  region          Region?  @relation(fields: [regionId], references: [id])
+}
+
+model Investment {
+  id              String   @id @default(cuid())
+  userId          String
+  startupId       String
+  amount          Float    // Investment amount
+  equity          Float    // Equity percentage
+  shares          Int      // Number of shares
+  platformFee     Float    // Platform commission fee
+  processingFee   Float    // Payment processing fee
+  totalAmount     Float    // Total amount paid
+  status          String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  transactionId   String?  // Payment transaction ID
+  secondaryListing SecondaryListing?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id])
+  startup         Startup  @relation(fields: [startupId], references: [id])
+  payment         Payment? @relation(fields: [paymentId], references: [id])
+  paymentId       String?  @unique
+}
+
+model Subscription {
+  id              String   @id @default(cuid())
+  userId          String
+  tier            String   // FREE, SILVER, GOLD, PLATINUM
+  amount          Float    // Subscription amount
+  currency        String   @default("INR")
+  status          String   @default("ACTIVE") // ACTIVE, CANCELLED, EXPIRED
+  startDate       DateTime
+  endDate         DateTime
+  autoRenew       Boolean  @default(true)
+  paymentId       String?  // Associated payment ID
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id])
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  userId          String?
+  amount          Float
+  currency        String   @default("INR")
+  paymentMethod   String   // UPI, CARD, NETBANKING, WALLET
+  status          String   @default("PENDING") // PENDING, COMPLETED, FAILED, REFUNDED
+  transactionId   String?  // Payment gateway transaction ID
+  description     String?
+  metadata        String?  // JSON string for additional data
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  user            User?    @relation(fields: [userId], references: [id])
+  investment      Investment?
+  enrollments     Enrollment[]
+  reportPurchases ReportPurchase[]
+}
+
+// Educational Content Models
+model Course {
+  id              String   @id @default(cuid())
+  title           String
+  description     String
+  category        String   // INVESTMENT_STRATEGY, STARTUP_FUNDING, MARKET_ANALYSIS, etc.
+  level           String   @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
+  price           Float
+  currency        String   @default("INR")
+  duration        Int      // Duration in minutes
+  instructor      String
+  thumbnail       String?  // URL to thumbnail image
+  videoUrl        String?  // URL to course video
+  content         String?  // Course content (JSON structure)
+  status          String   @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+  featured        Boolean  @default(false)
+  enrollmentCount Int      @default(0)
+  rating          Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  chapters        Chapter[]
+  enrollments     Enrollment[]
+  reviews         Review[]
+}
+
+model Chapter {
+  id              String   @id @default(cuid())
+  courseId        String
+  title           String
+  description     String?
+  videoUrl        String?
+  content         String?
+  duration        Int      // Duration in minutes
+  order           Int
+  isFree          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  course          Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+model Enrollment {
+  id              String   @id @default(cuid())
+  userId          String
+  courseId        String
+  paymentId       String?  // Payment record for paid courses
+  progress        Float    @default(0) // Progress percentage
+  completedAt      DateTime?
+  certificateUrl  String?  // URL to completion certificate
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id])
+  course          Course   @relation(fields: [courseId], references: [id])
+  payment         Payment?  @relation(fields: [paymentId], references: [id])
+  
+  @@unique([userId, courseId])
+}
+
+model Review {
+  id              String   @id @default(cuid())
+  userId          String
+  courseId        String
+  rating          Int      // 1-5 stars
+  comment         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id])
+  course          Course   @relation(fields: [courseId], references: [id])
+  
+  @@unique([userId, courseId])
+}
+
+// Analytics Services Models
+model AnalyticsReport {
+  id              String   @id @default(cuid())
+  title           String
+  description     String
+  type            String   // MARKET_ANALYSIS, STARTUP_TRENDS, INVESTOR_INSIGHTS, etc.
+  price           Float
+  currency        String   @default("INR")
+  reportData      String?  // JSON string with report data
+  fileUrl         String?  // URL to downloadable report
+  generatedAt     DateTime
+  validUntil      DateTime?
+  isPublic        Boolean  @default(false)
+  downloadCount   Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  purchases       ReportPurchase[]
+}
+
+model ReportPurchase {
+  id              String   @id @default(cuid())
+  userId          String
+  reportId        String
+  paymentId       String
+  downloadedAt    DateTime?
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id])
+  report          AnalyticsReport @relation(fields: [reportId], references: [id])
+  payment         Payment  @relation(fields: [paymentId], references: [id])
+  
+  @@unique([userId, reportId])
+}
+
+// Phase 3: Data Products and API Access
+model ApiSubscription {
+  id              String   @id @default(cuid())
+  userId          String
+  plan            String   // BASIC, PRO, ENTERPRISE
+  price           Float
+  currency        String   @default("INR")
+  status          String   @default("ACTIVE") // ACTIVE, CANCELLED, EXPIRED
+  startDate       DateTime
+  endDate         DateTime
+  apiKeys         ApiKey[]
+  usageStats      ApiUsage[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id])
+}
+
+model ApiKey {
+  id              String   @id @default(cuid())
+  subscriptionId  String
+  key             String   @unique
+  name            String
+  permissions     String   // JSON array of permissions
+  lastUsed        DateTime?
+  rateLimit       Int      @default(1000) // requests per hour
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  subscription    ApiSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+}
+
+model ApiUsage {
+  id              String   @id @default(cuid())
+  subscriptionId  String
+  endpoint        String
+  method          String   // GET, POST, PUT, DELETE
+  requestCount    Int      @default(1)
+  timestamp       DateTime @default(now())
+  
+  // Relations
+  subscription    ApiSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+}
+
+// Phase 3: Advertising Platform
+model AdCampaign {
+  id              String   @id @default(cuid())
+  userId          String
+  title           String
+  description     String
+  targetAudience  String   // JSON string with targeting criteria
+  budget          Float
+  spent           Float    @default(0)
+  startDate       DateTime
+  endDate         DateTime
+  status          String   @default("DRAFT") // DRAFT, ACTIVE, PAUSED, COMPLETED
+  adCreatives     AdCreative[]
+  adMetrics       AdMetric[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id])
+}
+
+model AdCreative {
+  id              String   @id @default(cuid())
+  campaignId      String
+  title           String
+  imageUrl        String?
+  videoUrl        String?
+  landingUrl      String
+  adFormat        String   // BANNER, VIDEO, NATIVE
+  ctaText         String?
+  status          String   @default("ACTIVE") // ACTIVE, PAUSED, INACTIVE
+  impressions     Int      @default(0)
+  clicks          Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  campaign        AdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+model AdMetric {
+  id              String   @id @default(cuid())
+  campaignId      String
+  date            DateTime
+  impressions     Int      @default(0)
+  clicks          Int      @default(0)
+  spend           Float    @default(0)
+  conversions     Int      @default(0)
+  ctr             Float    @default(0) // Click-through rate
+  cpc             Float    @default(0) // Cost per click
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  campaign        AdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+// Phase 3: Partnership Programs
+model Partnership {
+  id              String   @id @default(cuid())
+  name            String
+  type            String   // VC_FIRM, ACCELERATOR, CORPORATE, UNIVERSITY
+  description     String
+  website         String?
+  logoUrl         String?
+  contactEmail    String
+  contactPhone    String?
+  status          String   @default("ACTIVE") // ACTIVE, INACTIVE, PENDING
+  partnershipTier String   @default("BASIC") // BASIC, PREMIUM, STRATEGIC
+  benefits        String   // JSON string with partnership benefits
+  deals           PartnershipDeal[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PartnershipDeal {
+  id              String   @id @default(cuid())
+  partnershipId   String
+  startupId       String
+  dealType        String   // CO_INVESTMENT, MENTORSHIP, RESOURCES, MARKETING
+  terms           String   // JSON string with deal terms
+  status          String   @default("PROPOSED") // PROPOSED, ACCEPTED, ACTIVE, COMPLETED, TERMINATED
+  startDate       DateTime?
+  endDate         DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  partnership     Partnership @relation(fields: [partnershipId], references: [id])
+  startup         Startup     @relation("PartnershipStartups", fields: [startupId], references: [id])
+  
+  @@unique([partnershipId, startupId])
+}
+
+// Phase 4: Secondary Market
+model SecondaryListing {
+  id              String   @id @default(cuid())
+  investmentId    String   @unique
+  userId          String
+  shares           Int
+  pricePerShare   Float
+  totalValue      Float
+  minInvestment   Float
+  maxInvestment   Float?
+  status          String   @default("LISTED") // LISTED, PENDING, SOLD, CANCELLED
+  expiresAt       DateTime?
+  description     String?
+  secondaryTrades SecondaryTrade[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  user            User        @relation(fields: [userId], references: [id])
+  investment      Investment  @relation(fields: [investmentId], references: [id])
+}
+
+model SecondaryTrade {
+  id              String   @id @default(cuid())
+  listingId       String
+  buyerId         String
+  sellerId        String
+  shares           Int
+  pricePerShare   Float
+  totalValue      Float
+  platformFee     Float
+  status          String   @default("PENDING") // PENDING, COMPLETED, FAILED
+  transactionId   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  listing         SecondaryListing @relation(fields: [listingId], references: [id])
+  buyer           User            @relation("BuyerTrades", fields: [buyerId], references: [id])
+  seller          User            @relation("SellerTrades", fields: [sellerId], references: [id])
+}
+
+// Phase 4: Exit Services
+model ExitOpportunity {
+  id              String   @id @default(cuid())
+  startupId       String
+  type            String   // ACQUISITION, IPO, MERGER, SECONDARY_SALE
+  targetCompany   String?
+  dealSize        Float?
+  status          String   @default("POTENTIAL") // POTENTIAL, IN_DISCUSSION, TERM_SHEET, DUE_DILIGENCE, COMPLETED, FAILED
+  expectedDate    DateTime?
+  actualDate      DateTime?
+  description     String?
+  terms           String?  // JSON string with exit terms
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  startup         Startup @relation(fields: [startupId], references: [id])
+}
+
+model ExitService {
+  id              String   @id @default(cuid())
+  name            String
+  description     String
+  type            String   // LEGAL, FINANCIAL, STRATEGIC, OPERATIONAL
+  price           Float
+  currency        String   @default("INR")
+  provider        String   // Service provider name
+  duration        String?  // Service duration
+  isActive        Boolean  @default(true)
+  exitRequests    ExitRequest[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ExitRequest {
+  id              String   @id @default(cuid())
+  userId          String
+  serviceId       String
+  startupId       String?
+  status          String   @default("REQUESTED") // REQUESTED, QUOTED, ACCEPTED, IN_PROGRESS, COMPLETED, CANCELLED
+  quoteAmount     Float?
+  currency        String   @default("INR")
+  requirements    String?  // JSON string with service requirements
+  timeline        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  user            User         @relation(fields: [userId], references: [id])
+  service         ExitService  @relation(fields: [serviceId], references: [id])
+  startup         Startup?     @relation(fields: [startupId], references: [id])
+}
+
+// Phase 4: International Expansion
+model Region {
+  id              String   @id @default(cuid())
+  name            String
+  code            String   @unique // ISO country code
+  currency        String   @default("USD")
+  timezone        String
+  isActive        Boolean  @default(false)
+  regulations     String?  // JSON string with local regulations
+  taxInfo         String?  // JSON string with tax information
+  startups        Startup[]
+  localizations   Localization[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Localization {
+  id              String   @id @default(cuid())
+  regionId        String
+  key             String
+  value           String
+  language        String   @default("en")
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  region          Region @relation(fields: [regionId], references: [id])
+  
+  @@unique([regionId, key, language])
+}
